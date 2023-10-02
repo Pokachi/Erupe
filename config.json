@@ -128,7 +128,7 @@
     "Enabled": true,
     "Port": 53312
   },
-  "SignV2": {
+  "API": {
     "Enabled": false,
     "Port": 8080
   },

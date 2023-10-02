@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"erupe-ce/server/apiserver"
 	"erupe-ce/server/channelserver"
 	"erupe-ce/server/discordbot"
 	"erupe-ce/server/entranceserver"
 	"erupe-ce/server/signserver"
-	"erupe-ce/server/signv2server"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -177,21 +177,21 @@ func main() {
 	}
 
 	// New Sign server
-	var newSignServer *signv2server.Server
-	if config.SignV2.Enabled {
-		newSignServer = signv2server.NewServer(
-			&signv2server.Config{
-				Logger:      logger.Named("sign"),
+	var newSignServer *apiserver.Server
+	if config.API.Enabled {
+		newSignServer = apiserver.NewServer(
+			&apiserver.Config{
+				Logger:      logger.Named("API"),
 				ErupeConfig: _config.ErupeConfig,
 				DB:          db,
 			})
 		err = newSignServer.Start()
 		if err != nil {
-			preventClose(fmt.Sprintf("SignV2: Failed to start, %s", err.Error()))
+			preventClose(fmt.Sprintf("API: Failed to start, %s", err.Error()))
 		}
-		logger.Info("SignV2: Started successfully")
+		logger.Info("API: Started successfully")
 	} else {
-		logger.Info("SignV2: Disabled")
+		logger.Info("API: Disabled")
 	}
 
 	var channels []*channelserver.Server
@@ -269,7 +269,7 @@ func main() {
 		signServer.Shutdown()
 	}
 
-	if config.SignV2.Enabled {
+	if config.API.Enabled {
 		newSignServer.Shutdown()
 	}
 

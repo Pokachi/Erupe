@@ -88,7 +88,7 @@ type Config struct {
 	Courses         []Course
 	Database        Database
 	Sign            Sign
-	SignV2          SignV2
+	API             API
 	Channel         Channel
 	Entrance        Entrance
 }
@@ -189,8 +189,8 @@ type Sign struct {
 	Port    int
 }
 
-// SignV2 holds the new sign server config
-type SignV2 struct {
+// API holds the API config
+type API struct {
 	Enabled bool
 	Port    int
 }

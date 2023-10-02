@@ -1,8 +1,8 @@
-package signv2server
+package apiserver
 
 import (
 	"context"
-	"erupe-ce/config"
+	_config "erupe-ce/config"
 	"fmt"
 	"net/http"
 	"os"
@@ -53,7 +53,7 @@ func (s *Server) Start() error {
 	r.HandleFunc("/character/delete", s.DeleteCharacter)
 	handler := handlers.CORS(handlers.AllowedHeaders([]string{"Content-Type"}))(r)
 	s.httpServer.Handler = handlers.LoggingHandler(os.Stdout, handler)
-	s.httpServer.Addr = fmt.Sprintf(":%d", s.erupeConfig.SignV2.Port)
+	s.httpServer.Addr = fmt.Sprintf(":%d", s.erupeConfig.API.Port)
 
 	serveError := make(chan error, 1)
 	go func() {

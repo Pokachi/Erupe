@@ -1,4 +1,4 @@
-package signv2server
+package apiserver
 
 import (
 	"database/sql"
