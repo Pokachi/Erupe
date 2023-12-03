@@ -90,7 +90,7 @@ func handleMsgMhfGetUdSchedule(s *Session, p mhfpacket.MHFPacket) {
 	var timestamps []uint32
 	if s.server.erupeConfig.DevMode && s.server.erupeConfig.DevModeOptions.DivaEvent >= 0 {
 		if s.server.erupeConfig.DevModeOptions.DivaEvent == 0 {
-			if s.server.erupeConfig.RealClientMode <= _config.Z1 {
+			if s.server.erupeConfig.RealClientMode >= _config.Z2 {
 				doAckBufSucceed(s, pkt.AckHandle, make([]byte, 32))
 			} else {
 				doAckBufSucceed(s, pkt.AckHandle, make([]byte, 36))
@@ -101,8 +101,8 @@ func handleMsgMhfGetUdSchedule(s *Session, p mhfpacket.MHFPacket) {
 	} else {
 		timestamps = generateDivaTimestamps(s, start, false)
 	}
-
-	if s.server.erupeConfig.RealClientMode > _config.Z1 {
+  
+	if s.server.erupeConfig.RealClientMode >= _config.Z2 {
 		bf.WriteUint32(id)
 	}
 	for i := range timestamps {

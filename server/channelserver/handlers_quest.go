@@ -47,6 +47,10 @@ func handleMsgSysGetFile(s *Session, p mhfpacket.MHFPacket) {
 			)
 		}
 
+		if s.server.erupeConfig.GameplayOptions.SeasonOverride {
+			pkt.Filename = seasonConversion(s, pkt.Filename)
+		}
+
 		data, err := os.ReadFile(filepath.Join(s.server.erupeConfig.BinPath, fmt.Sprintf("quests/%s.bin", pkt.Filename)))
 		if err != nil {
 			s.logger.Error(fmt.Sprintf("Failed to open file: %s/quests/%s.bin", s.server.erupeConfig.BinPath, pkt.Filename))
@@ -55,6 +59,33 @@ func handleMsgSysGetFile(s *Session, p mhfpacket.MHFPacket) {
 			return
 		}
 		doAckBufSucceed(s, pkt.AckHandle, data)
+	}
+}
+
+func seasonConversion(s *Session, questFile string) string {
+	filename := fmt.Sprintf("%s%d", questFile[:6], s.server.Season())
+
+	// Return the seasonal file
+	if _, err := os.Stat(filepath.Join(s.server.erupeConfig.BinPath, fmt.Sprintf("quests/%s.bin", filename))); err == nil {
+		return filename
+	} else {
+		// Attempt to return the requested quest file if the seasonal file doesn't exist
+		if _, err = os.Stat(filepath.Join(s.server.erupeConfig.BinPath, fmt.Sprintf("quests/%s.bin", questFile))); err == nil {
+			return questFile
+		}
+
+		// If the code reaches this point, it's most likely a custom quest with no seasonal variations in the files.
+		// Since event quests when seasonal pick day or night and the client requests either one, we need to differentiate between the two to prevent issues.
+		var _time string
+
+		if TimeGameAbsolute() > 2880 {
+			_time = "d"
+		} else {
+			_time = "n"
+		}
+
+		// Request a d0 or n0 file depending on the time of day. The time of day matters and issues will occur if it's different to the one it requests.
+		return fmt.Sprintf("%s%s%d", questFile[:5], _time, 0)
 	}
 }
 
@@ -77,6 +108,11 @@ func handleMsgMhfSaveFavoriteQuest(s *Session, p mhfpacket.MHFPacket) {
 }
 
 func loadQuestFile(s *Session, questId int) []byte {
+	data, exists := s.server.questCacheData[questId]
+	if exists && s.server.questCacheTime[questId].Add(time.Duration(s.server.erupeConfig.QuestCacheExpiry)*time.Second).After(time.Now()) {
+		return data
+	}
+
 	file, err := os.ReadFile(filepath.Join(s.server.erupeConfig.BinPath, fmt.Sprintf("quests/%05dd0.bin", questId)))
 	if err != nil {
 		return nil
@@ -113,14 +149,17 @@ func loadQuestFile(s *Session, questId int) []byte {
 	}
 	questBody.WriteBytes(newStrings.Data())
 
+	s.server.questCacheData[questId] = questBody.Data()
+	s.server.questCacheTime[questId] = time.Now()
 	return questBody.Data()
 }
 
 func makeEventQuest(s *Session, rows *sql.Rows) ([]byte, error) {
 	var id, mark uint32
-	var questId int
+	var questId, activeDuration, inactiveDuration, flags int
 	var maxPlayers, questType uint8
-	rows.Scan(&id, &maxPlayers, &questType, &questId, &mark)
+	var startTime time.Time
+	rows.Scan(&id, &maxPlayers, &questType, &questId, &mark, &flags, &startTime, &activeDuration, &inactiveDuration)
 
 	data := loadQuestFile(s, questId)
 	if data == nil {
@@ -168,7 +207,12 @@ func makeEventQuest(s *Session, rows *sql.Rows) ([]byte, error) {
 	if s.server.erupeConfig.GameplayOptions.SeasonOverride {
 		bf.WriteUint8(flagByte & 0b11100000)
 	} else {
-		bf.WriteUint8(flagByte)
+		// Allow for seasons to be specified in database, otherwise use the one in the file.
+		if flags < 0 {
+			bf.WriteUint8(flagByte)
+		} else {
+			bf.WriteUint8(uint8(flags))
+		}
 	}
 
 	// Bitset Structure Quest Variant 1: b8 UL Fixed, b7 UNK, b6 UNK, b5 UNK, b4 G Rank, b3 HC to UL, b2 Fix HC, b1 Hiden
@@ -192,23 +236,59 @@ func handleMsgMhfEnumerateQuest(s *Session, p mhfpacket.MHFPacket) {
 	bf := byteframe.NewByteFrame()
 	bf.WriteUint16(0)
 
-	rows, _ := s.server.db.Query("SELECT id, COALESCE(max_players, 4) AS max_players, quest_type, quest_id, COALESCE(mark, 0) AS mark FROM event_quests ORDER BY quest_id")
-	for rows.Next() {
-		data, err := makeEventQuest(s, rows)
-		if err != nil {
-			continue
-		} else {
-			if len(data) > 896 || len(data) < 352 {
+	rows, err := s.server.db.Query("SELECT id, COALESCE(max_players, 4) AS max_players, quest_type, quest_id, COALESCE(mark, 0) AS mark, COALESCE(flags, -1), start_time, COALESCE(active_days, 0) AS active_days, COALESCE(inactive_days, 0) AS inactive_days FROM event_quests ORDER BY quest_id")
+	if err == nil {
+		currentTime := time.Now()
+		tx, _ := s.server.db.Begin()
+
+		for rows.Next() {
+			var id, mark uint32
+			var questId, flags, activeDays, inactiveDays int
+			var maxPlayers, questType uint8
+			var startTime time.Time
+
+			err = rows.Scan(&id, &maxPlayers, &questType, &questId, &mark, &flags, &startTime, &activeDays, &inactiveDays)
+			if err != nil {
+				continue
+			}
+
+			// Use the Event Cycling system
+			if activeDays > 0 {
+				cycleLength := (time.Duration(activeDays) + time.Duration(inactiveDays)) * 24 * time.Hour
+
+				// Count the number of full cycles elapsed since the last rotation.
+				extraCycles := int(currentTime.Sub(startTime) / cycleLength)
+
+				if extraCycles > 0 {
+					// Calculate the rotation time based on start time, active duration, and inactive duration.
+					rotationTime := startTime.Add(time.Duration(activeDays+inactiveDays) * 24 * time.Hour * time.Duration(extraCycles))
+					if currentTime.After(rotationTime) {
+						// Normalize rotationTime to 12PM JST to align with the in-game events update notification.
+						newRotationTime := time.Date(rotationTime.Year(), rotationTime.Month(), rotationTime.Day(), 12, 0, 0, 0, TimeAdjusted().Location())
+
+						_, err = tx.Exec("UPDATE event_quests SET start_time = $1 WHERE id = $2", newRotationTime, id)
+						if err != nil {
+							tx.Rollback() // Rollback if an error occurs
+							break
+						}
+						startTime = newRotationTime // Set the new start time so the quest can be used/removed immediately.
+					}
+				}
+
+				// Check if the quest is currently active
+				if currentTime.Before(startTime) || currentTime.After(startTime.Add(time.Duration(activeDays)*24*time.Hour)) {
+					break
+				}
+			}
+
+			data, err := makeEventQuest(s, rows)
+			if err != nil {
 				continue
 			} else {
-				totalCount++
-				if _config.ErupeConfig.RealClientMode == _config.F5 {
-					if totalCount > pkt.Offset && len(bf.Data()) < 21550 {
-						returnedCount++
-						bf.WriteBytes(data)
-						continue
-					}
+				if len(data) > 896 || len(data) < 352 {
+					continue
 				} else {
+					totalCount++
 					if totalCount > pkt.Offset && len(bf.Data()) < 60000 {
 						returnedCount++
 						bf.WriteBytes(data)
@@ -217,6 +297,9 @@ func handleMsgMhfEnumerateQuest(s *Session, p mhfpacket.MHFPacket) {
 				}
 			}
 		}
+
+		rows.Close()
+		tx.Commit()
 	}
 
 	type tuneValue struct {
