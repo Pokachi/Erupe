@@ -1,7 +1,7 @@
 BEGIN;
 
 INSERT INTO public.shop_items
-(shop_type, shop_id, item_id, cost, quantity, min_hr, min_sr, min_gr, store_level, max_quantity, road_floors, road_fatalis)
+    (shop_type, shop_id, item_id, cost, quantity, min_hr, min_sr, min_gr, store_level, max_quantity, road_floors, road_fatalis)
 VALUES
     (8,5,1,30,10,0,0,0,0,10,0,0),
     (8,5,2,60,10,0,0,0,0,10,0,0),

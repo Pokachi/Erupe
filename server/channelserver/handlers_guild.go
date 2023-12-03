@@ -1524,11 +1524,6 @@ func handleMsgMhfGetGuildManageRight(s *Session, p mhfpacket.MHFPacket) {
 	doAckBufSucceed(s, pkt.AckHandle, bf.Data())
 }
 
-func handleMsgMhfGetUdGuildMapInfo(s *Session, p mhfpacket.MHFPacket) {
-	pkt := p.(*mhfpacket.MsgMhfGetUdGuildMapInfo)
-	doAckSimpleFail(s, pkt.AckHandle, make([]byte, 4))
-}
-
 func handleMsgMhfGetGuildTargetMemberNum(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfGetGuildTargetMemberNum)
 
@@ -2026,11 +2021,6 @@ func handleMsgMhfAddGuildWeeklyBonusExceptionalUser(s *Session, p mhfpacket.MHFP
 	// TODO: record pkt.NumUsers to DB
 	// must use addition
 	doAckSimpleSucceed(s, pkt.AckHandle, []byte{0x00, 0x00, 0x00, 0x00})
-}
-
-func handleMsgMhfGenerateUdGuildMap(s *Session, p mhfpacket.MHFPacket) {
-	pkt := p.(*mhfpacket.MsgMhfGenerateUdGuildMap)
-	doAckSimpleFail(s, pkt.AckHandle, make([]byte, 4))
 }
 
 func handleMsgMhfUpdateGuild(s *Session, p mhfpacket.MHFPacket) {}
