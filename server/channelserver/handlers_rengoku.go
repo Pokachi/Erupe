@@ -92,10 +92,14 @@ func handleMsgMhfLoadRengokuData(s *Session, p mhfpacket.MHFPacket) {
 func handleMsgMhfGetRengokuBinary(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfGetRengokuBinary)
 	// a (massively out of date) version resides in the game's /dat/ folder or up to date can be pulled from packets
-	data, err := os.ReadFile(filepath.Join(s.server.erupeConfig.BinPath, "rengoku_data.bin"))
-	if err != nil {
-		panic(err)
-	}
+	var road_type int
+	if err != nil {		s.server.db.QueryRow(`SELECT COALESCE(road_type, 0) FROM road_type WHERE character_id = $1`, s.charID).Scan(&road_type)
+		panic(err)		var data []byte
+	var err error
+	if road_type == 0 {			
+		data, err = os.ReadFile(filepath.Join(s.server.erupeConfig.BinPath, "rengoku_data.bin"))
+	} else if road_type == 1 {
+		data, err = os.ReadFile(filepath.Join(s.server.erupeConfig.BinPath, "rengoku_data_z4.bin"))
 	doAckBufSucceed(s, pkt.AckHandle, data)
 }
 

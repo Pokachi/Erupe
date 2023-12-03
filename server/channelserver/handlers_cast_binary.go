@@ -86,6 +86,32 @@ func sendServerChatMessage(s *Session, message string) {
 func parseChatCommand(s *Session, command string) {
 	args := strings.Split(command[len(s.server.erupeConfig.CommandPrefix):], " ")
 	switch args[0] {
+	case commands["Road"].Prefix:
+		if commands["Road"].Enabled {
+			if args[1] == "z4" {
+				_, err := s.server.db.Exec(`INSERT INTO road_type VALUES ($1, 1) ON CONFLICT (character_id) DO UPDATE SET road_type = 1`, s.charID)
+				if err == nil {
+					sendServerChatMessage(s, fmt.Sprintf(s.server.dict["commandRoadSuccess"], args[1]))
+				}
+			} else if args[1] == "normal" {
+				_, err := s.server.db.Exec(`INSERT INTO road_type VALUES ($1, 0) ON CONFLICT (character_id) DO UPDATE SET road_type = 0`, s.charID)
+				if err == nil {
+					sendServerChatMessage(s, fmt.Sprintf(s.server.dict["commandRoadSuccess"], args[1]))
+				}
+			} else if args[1] == "check" {
+				var road_type int
+				s.server.db.QueryRow(`SELECT COALESCE(road_type, 0) FROM road_type WHERE character_id = $1`, s.charID).Scan(&road_type)
+				if (road_type == 0) {
+					sendServerChatMessage(s, fmt.Sprintf(s.server.dict["commandRoadCurrent"], "normal"))
+				} else if (road_type == 1) {
+					sendServerChatMessage(s, fmt.Sprintf(s.server.dict["commandRoadCurrent"], "z4"))
+				}
+			} else {
+				sendServerChatMessage(s, fmt.Sprintf(s.server.dict["commandRoadError"], commands["Road"].Prefix))
+			}
+		} else {
+			sendDisabledCommandMessage(s, commands["Road"])
+		}
 	case commands["PSN"].Prefix:
 		if commands["PSN"].Enabled {
 			if len(args) > 1 {

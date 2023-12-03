@@ -73,6 +73,9 @@ func getLangStrings(s *Server) map[string]string {
 		strings["commandRaviError"] = "ラヴィコマンドが認識されません"
 		strings["commandRaviNoPlayers"] = "誰も大討伐に参加していません"
 		strings["commandRaviVersion"] = "This command is disabled outside of MHFZZ"
+		strings["commandRoadError"] = "Error in command. Format: %s <road type>"
+		strings["commandRoadSuccess"] = "Road is updated to: %s"
+		strings["commandRoadCurrent"] = "Road is currently set to: %s"
 
 		strings["ravienteBerserk"] = "<大討伐：猛狂期>が開催されました！"
 		strings["ravienteExtreme"] = "<大討伐：猛狂期【極】>が開催されました！"
@@ -163,6 +166,9 @@ func getLangStrings(s *Server) map[string]string {
 		strings["commandRaviError"] = "Raviente command not recognised!"
 		strings["commandRaviNoPlayers"] = "No one has joined the Great Slaying!"
 		strings["commandRaviVersion"] = "This command is disabled outside of MHFZZ"
+		strings["commandRoadError"] = "Error in command. Format: %s <road type>"
+		strings["commandRoadSuccess"] = "Road is updated to: %s"
+		strings["commandRoadCurrent"] = "Road is currently set to: %s"
 
 		strings["ravienteBerserk"] = "<Great Slaying: Berserk> is being held!"
 		strings["ravienteExtreme"] = "<Great Slaying: Extreme> is being held!"
